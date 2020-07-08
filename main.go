@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
@@ -39,6 +40,10 @@ func main() {
 
 		// 3. For each message add our Foo() method
 		for _, msg := range file.Messages {
+
+			opts := msg.Desc.Options()
+
+			log.Println(opts)
 
 			if strings.HasSuffix(string(msg.Desc.Name()), "Response") || strings.HasSuffix(string(msg.Desc.Name()), "Request") {
 				continue
