@@ -4,4 +4,8 @@ package dynamodb;
 
 import "google/protobuf/descriptor.proto";
 
-extend google.protobuf.MessageOptions { bool storable = 50000; }
+extend google.protobuf.MessageOptions {
+  DynamoDBMessageOptions dynamodb = 50000;
+}
+
+message DynamoDBMessageOptions { required bool storable = 1; }
