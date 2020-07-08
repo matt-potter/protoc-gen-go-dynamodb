@@ -54,7 +54,7 @@ func main() {
 		}
 
 		for _, storable := range messages {
-			generateFuncs(storable)
+			generateFuncs(file, storable)
 		}
 
 		file.Skip()
