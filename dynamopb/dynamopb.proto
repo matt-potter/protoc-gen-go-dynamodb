@@ -6,4 +6,12 @@ option go_package = "github.com/matt-potter/protoc-gen-go-dynamodb/dynamopb";
 
 import "google/protobuf/descriptor.proto";
 
-extend google.protobuf.MessageOptions { bool storable = 50001; }
+extend google.protobuf.MessageOptions {
+  bool storable = 50001;
+  repeated GSI global_secondary_indexes = 50002;
+}
+
+message GSI {
+  string partition_key = 1;
+  string sort_key = 2;
+}
