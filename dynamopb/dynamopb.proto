@@ -12,6 +12,7 @@ extend google.protobuf.MessageOptions {
 }
 
 message GSI {
-  string partition_key = 1;
-  string sort_key = 2;
+  string name = 1;
+  string partition_key = 2;
+  string sort_key = 3;
 }
