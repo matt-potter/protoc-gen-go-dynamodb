@@ -14,7 +14,7 @@ extend google.protobuf.MessageOptions {
 message gsi {
   string name = 1;
   key_definition partition_key = 2;
-  string sort_key = 3;
+  key_definition sort_key = 3;
 }
 
 message key_definition {
