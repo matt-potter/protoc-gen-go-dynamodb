@@ -78,7 +78,7 @@ func main() {
 			}
 
 			if proto.HasExtension(msg.Desc.Options(), dynamopb.E_GlobalSecondaryIndexes) {
-				gsis := proto.GetExtension(msg.Desc.Options(), dynamopb.E_GlobalSecondaryIndexes).([]*dynamopb.GSI)
+				gsis := proto.GetExtension(msg.Desc.Options(), dynamopb.E_GlobalSecondaryIndexes).([]*dynamopb.Gsi)
 				for _, gsi := range gsis {
 					log.Println(gsi)
 				}
