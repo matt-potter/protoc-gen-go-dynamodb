@@ -8,8 +8,13 @@ import "google/protobuf/descriptor.proto";
 
 extend google.protobuf.MessageOptions {
   bool storable = 50001;
-  key_definition primary_index = 50002;
+  pk primary_index = 50002;
   repeated gsi global_secondary_indexes = 50003;
+}
+
+message pk {
+  key_definition partition_key = 2;
+  key_definition sort_key = 3;
 }
 
 message gsi {
