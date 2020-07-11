@@ -3,11 +3,11 @@ package generator
 import (
 	"errors"
 	"fmt"
-	"html/template"
 	"log"
 	"os"
 	"path"
 	"strings"
+	"text/template"
 
 	"github.com/jinzhu/inflection"
 	"github.com/matt-potter/protoc-gen-go-dynamodb/dynamopb"
