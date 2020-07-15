@@ -68,7 +68,7 @@ func (d *DB) DDBCreate{{ .MessageName }}(ctx context.Context, item *{{ .MessageN
 }
 `
 
-var DynamoDBGetMessageNoHash = `
+var DynamoDBGetMessage = `
 func (d *DB) DDBGet{{ .MessageName }}(ctx context.Context, name string) (*{{ .MessageName }}, error) {
 
 	input := &dynamodb.GetItemInput{
