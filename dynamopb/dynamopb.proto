@@ -10,16 +10,11 @@ extend google.protobuf.MessageOptions { cfg config = 50001; }
 
 message cfg {
   string table_name = 1;
-  pk primary_index = 2;
-  repeated gsi global_secondary_indexes = 3;
+  index primary_index = 2;
+  repeated index global_secondary_indexes = 3;
 }
 
-message pk {
-  key_definition partition_key = 1;
-  key_definition sort_key = 2;
-}
-
-message gsi {
+message index {
   string index_name = 1;
   key_definition partition_key = 2;
   key_definition sort_key = 3;
