@@ -33,6 +33,6 @@ message key_definition {
     NUMBER = 2;
   }
 
-  string name = 1;
-  attribute_type type = 2;
+  string attr_name = 1;
+  attribute_type attr_type = 2;
 }
