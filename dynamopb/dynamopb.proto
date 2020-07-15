@@ -6,11 +6,12 @@ option go_package = "github.com/matt-potter/protoc-gen-go-dynamodb/dynamopb";
 
 import "google/protobuf/descriptor.proto";
 
-extend google.protobuf.MessageOptions {
-  string table_name = 50001;
-  bool storable = 50002;
-  pk primary_index = 50003;
-  repeated gsi global_secondary_indexes = 50004;
+extend google.protobuf.MessageOptions { cfg config = 50001; }
+
+message cfg {
+  string table_name = 1;
+  pk primary_index = 2;
+  repeated gsi global_secondary_indexes = 3;
 }
 
 message pk {

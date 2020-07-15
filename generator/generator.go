@@ -269,27 +269,19 @@ func (g *Generator) generateMethods(file *protogen.File, f *protogen.GeneratedFi
 
 	for _, msg := range file.Messages {
 
-		if proto.HasExtension(msg.Desc.Options(), dynamopb.E_Storable) {
-			storable := proto.GetExtension(msg.Desc.Options(), dynamopb.E_Storable).(bool)
-			if !storable {
-				continue
-			}
+		if proto.HasExtension(msg.Desc.Options(), dynamopb.E_Config) {
+
 		} else {
 			continue
 		}
 
-		var pk *dynamopb.Pk
-		var gsis []*dynamopb.Gsi
+		c, ok := proto.GetExtension(msg.Desc.Options(), dynamopb.E_Config).(*dynamopb.Cfg)
 
-		if proto.HasExtension(msg.Desc.Options(), dynamopb.E_PrimaryIndex) {
-			pk = proto.GetExtension(msg.Desc.Options(), dynamopb.E_PrimaryIndex).(*dynamopb.Pk)
+		if !ok {
+			log.Fatal("could not parse config: incorrect type")
 		}
 
-		if proto.HasExtension(msg.Desc.Options(), dynamopb.E_GlobalSecondaryIndexes) {
-			gsis = proto.GetExtension(msg.Desc.Options(), dynamopb.E_GlobalSecondaryIndexes).([]*dynamopb.Gsi)
-		}
-
-		if pk == nil {
+		if c.PrimaryIndex == nil {
 			log.Fatalf("storable is set but no primary_key is defined in %s", file.Desc.Path())
 		}
 
@@ -306,8 +298,8 @@ func (g *Generator) generateMethods(file *protogen.File, f *protogen.GeneratedFi
 		}{
 			PackageName:  string(file.GoPackageName),
 			MessageName:  msg.GoIdent.GoName,
-			PrimaryIndex: pk,
-			GSIs:         gsis,
+			PrimaryIndex: c.PrimaryIndex,
+			GSIs:         c.GlobalSecondaryIndexes,
 		}
 
 		t.Execute(f, config)
@@ -356,11 +348,7 @@ func (g *Generator) hasStorableMessages(f *protogen.File) bool {
 	hasStorable := false
 
 	for _, msg := range f.Messages {
-		if proto.HasExtension(msg.Desc.Options(), dynamopb.E_Storable) {
-			storable := proto.GetExtension(msg.Desc.Options(), dynamopb.E_Storable).(bool)
-			if !storable {
-				continue
-			}
+		if proto.HasExtension(msg.Desc.Options(), dynamopb.E_Config) {
 			hasStorable = true
 		} else {
 			continue
