@@ -2,7 +2,6 @@ package generator
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/matt-potter/protoc-gen-go-dynamodb/dynamopb"
@@ -58,8 +57,6 @@ func NewGenerator(plugin *protogen.Plugin, pathType string) (*Generator, error) 
 	gen.protoPath = pp
 
 	gen.plugin = plugin
-
-	log.Printf("%+v", gen)
 
 	return gen, nil
 }
