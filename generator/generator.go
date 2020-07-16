@@ -31,6 +31,8 @@ func NewGenerator(plugin *protogen.Plugin, pathType string) (*Generator, error) 
 
 	gen := &Generator{}
 
+	gen.pathType = pathType
+
 	pkg, err := getPackageName(plugin.Files)
 
 	if err != nil {

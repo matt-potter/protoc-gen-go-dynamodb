@@ -31,6 +31,7 @@ func main() {
 	var pathType string
 
 	for _, param := range strings.Split(req.GetParameter(), ",") {
+
 		var value string
 		if i := strings.Index(param, "="); i >= 0 {
 			value = param[i+1:]
