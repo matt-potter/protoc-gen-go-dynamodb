@@ -36,7 +36,7 @@ const TableName{{ .MessageName }} = "{{ .TableName }}"
 `
 
 var DynamoDBGetMessageMulti = `
-func (d *DB) DDBGet{{ .MessageName | Plural }}(ctx context.Context, prefix string, startKey string, limit int64) ({{ .MessageName | Plural | ToLower }} []*{{ .MessageName }}, lastEvaluatedKey string, err error) {
+func (d *DB) DDBGet{{ .MessageName | Plural }}(ctx context.Context, prefix string, startKey string, limit int32) ({{ .MessageName | Plural | ToLower }} []*{{ .MessageName }}, lastEvaluatedKey string, err error) {
 
 	type lastKeyResponse map[string]struct {
 	}
@@ -65,7 +65,6 @@ func (d *DB) DDBGet{{ .MessageName | Plural }}(ctx context.Context, prefix strin
 		}
 
 		log.Println("Decoded", string(decoded))
-
 		exclusiveStartKey, err := dynamodbattribute.MarshalMap(string(decoded))
 
 		if err != nil {

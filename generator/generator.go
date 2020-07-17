@@ -25,6 +25,12 @@ var DynamoGoMap = map[dynamopb.KeyDefinitionAttributeType]string{
 	dynamopb.KeyDefinition_NUMBER: "int",
 }
 
+var DynamoAttributeGoMap = map[dynamopb.KeyDefinitionAttributeType]string{
+	dynamopb.KeyDefinition_STRING: "S",
+	dynamopb.KeyDefinition_BINARY: "B",
+	dynamopb.KeyDefinition_NUMBER: "N",
+}
+
 // NewGenerator is a wrapper function to generate our dynamo code
 func NewGenerator(plugin *protogen.Plugin, pathType string) (*Generator, error) {
 

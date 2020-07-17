@@ -157,7 +157,39 @@ func (g *Generator) generateMessageQuery(f *protogen.GeneratedFile, msg *protoge
 
 }
 
+func (g *Generator) generateLastKeyTypes(f *protogen.GeneratedFile, msg *protogen.Message, index *dynamopb.Index) {
+
+	var indexName string
+
+	if index.GetIndexName() == "" {
+		indexName = "primary"
+	} else {
+		indexName = index.GetIndexName()
+	}
+
+	pk := index.GetPartitionKey()
+
+	if pk == nil {
+		log.Fatalf("Primary key required for index %s", index.GetIndexName())
+	}
+	if index.GetIndexName() == "" {
+		f.P(`type primaryLastKey struct {`)
+	} else {
+		f.P(`type `, sanitiseString(indexName), `LastKey struct {`)
+	}
+	f.P("	", strings.Title(sanitiseString(index.GetPartitionKey().GetAttrName())), " ", DynamoGoMap[index.GetPartitionKey().GetAttrType()], " `json:\"", strings.ToLower(sanitiseString(index.GetPartitionKey().GetAttrName())), "\"`")
+	if index.GetSortKey() != nil {
+		if index.GetSortKey().GetAttrName() != "" {
+			f.P("	", strings.Title(sanitiseString(index.GetSortKey().GetAttrName())), " ", DynamoGoMap[index.GetSortKey().GetAttrType()], " `json:\"", strings.ToLower(sanitiseString(index.GetSortKey().GetAttrName())), "\"`")
+		}
+	}
+	f.P(`}`)
+	f.P(``)
+
+}
+
 func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *protogen.Message, index *dynamopb.Index) {
+
 	f.P(`func (d *DB) DDBQuery`,
 		inflection.Plural(msg.GoIdent.GoName),
 		`By`,
@@ -166,9 +198,8 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 		strings.Title(index.SortKey.GetAttrName()),
 		`(ctx context.Context, expr expression.Expression, startKey string, limit int64) (`, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)),
 		` []*`, msg.GoIdent.GoName, `, lastEvaluatedKey string, err error) {`)
-
-	f.P(`type lastKeyResponse map[string]struct {`)
-	f.P(`}`)
+	f.P(``)
+	g.generateLastKeyTypes(f, msg, index)
 	f.P(``)
 	f.P(``)
 	f.P(``)
@@ -184,24 +215,50 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 	f.P(`}`)
 	f.P(``)
 	f.P(`if startKey != "" {`)
+	f.P(`	decoded, err := base64.StdEncoding.DecodeString(startKey)`)
 	f.P(``)
-	f.P(`decoded, err := base64.StdEncoding.DecodeString(startKey)`)
+	f.P(`	if err != nil {`)
+	f.P(`		return nil, "", err`)
+	f.P(`	}`)
 	f.P(``)
-	f.P(`if err != nil {`)
-	f.P(`return nil, "", err`)
-	f.P(`}`)
+	if index.GetIndexName() == "" {
+		f.P(`	key := new(primaryLastKey)`)
+	} else {
+		f.P(`	key := new(`, sanitiseString(index.GetIndexName()), `LastKey)`)
+	}
 	f.P(``)
-	f.P(`log.Println("Decoded", string(decoded))`)
+	f.P(`	err = json.Unmarshal(decoded, key)`)
 	f.P(``)
-	f.P(`exclusiveStartKey, err := dynamodbattribute.MarshalMap(string(decoded))`)
+	f.P(`	if err != nil {`)
+	f.P(`		return nil, "", err`)
+	f.P(`	}`)
 	f.P(``)
-	f.P(`if err != nil {`)
-	f.P(`return nil, "", err`)
-	f.P(`}`)
+	f.P(`	exclusiveStartKey := map[string]*dynamodb.AttributeValue{}`)
 	f.P(``)
-	f.P(`input.ExclusiveStartKey = exclusiveStartKey`)
+
+	switch index.GetPartitionKey().GetAttrType() {
+
+	case dynamopb.KeyDefinition_STRING:
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], ` = aws.String(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)`)
+	case dynamopb.KeyDefinition_NUMBER:
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], ` = aws.String(strconv.Itoa(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `))`)
+	case dynamopb.KeyDefinition_BINARY:
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], ` = []byte(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)`)
+	}
+
+	if index.GetSortKey() != nil {
+		switch index.GetSortKey().GetAttrType() {
+		case dynamopb.KeyDefinition_STRING:
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], ` = aws.String(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)`)
+		case dynamopb.KeyDefinition_NUMBER:
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], ` = aws.String(strconv.Itoa(key.`, strings.Title(index.GetSortKey().GetAttrName()), `))`)
+		case dynamopb.KeyDefinition_BINARY:
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], ` = []byte(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)`)
+		}
+	}
+
 	f.P(``)
-	f.P(`log.Println("EX:", exclusiveStartKey)`)
+	f.P(`	input.ExclusiveStartKey = exclusiveStartKey`)
 	f.P(`}`)
 	f.P(``)
 	f.P(`res, err := d.Client.QueryWithContext(ctx, input)`)
@@ -212,29 +269,36 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 	f.P(``)
 	f.P(`lastEvaluatedKey = ""`)
 	f.P(``)
+
 	f.P(`if len(res.LastEvaluatedKey) > 0 {`)
 	f.P(``)
-	f.P(`log.Println(res.LastEvaluatedKey)`)
+	if index.GetIndexName() == "" {
+		f.P(`	outKey := new(`, "primary", `LastKey)`)
+	} else {
+		f.P(`	outKey := new(`, sanitiseString(index.GetIndexName()), `LastKey)`)
+	}
 	f.P(``)
-	f.P(`pageResponseMap := make(map[string]interface{})`)
+	switch index.GetPartitionKey().GetAttrType() {
+
+	case dynamopb.KeyDefinition_STRING:
+		f.P(`	outKey.`, strings.Title(index.GetPartitionKey().GetAttrName()), ` = *res.LastEvaluatedKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()])
+	case dynamopb.KeyDefinition_NUMBER:
+		f.P(`	outKey.`, strings.Title(index.GetPartitionKey().GetAttrName()), `, err = strconv.Atoi(*res.LastEvaluatedKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `)`)
+	case dynamopb.KeyDefinition_BINARY:
+		f.P(`	outKey.`, strings.Title(index.GetPartitionKey().GetAttrName()), ` = res.LastEvaluatedKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()])
+	}
+
+	if index.GetSortKey() != nil {
+		f.P(`	outKey.`, strings.Title(index.GetSortKey().GetAttrName()), ` = *res.LastEvaluatedKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()])
+	}
 	f.P(``)
-	f.P(`for _, val := range res.LastEvaluatedKey {`)
-	f.P(`log.Println(val.GoString())`)
-	f.P(`}`)
+	f.P(`	b, err := json.Marshal(outKey)`)
 	f.P(``)
-	f.P(`err = dynamodbattribute.UnmarshalMap(res.LastEvaluatedKey, &pageResponseMap)`)
+	f.P(`	if err != nil {`)
+	f.P(`		return nil, "", err`)
+	f.P(`	}`)
 	f.P(``)
-	f.P(`if err != nil {`)
-	f.P(`return nil, "", err`)
-	f.P(`}`)
-	f.P(``)
-	f.P(`b, err := json.Marshal(pageResponseMap)`)
-	f.P(``)
-	f.P(`if err != nil {`)
-	f.P(`return nil, "", err`)
-	f.P(`}`)
-	f.P(``)
-	f.P(`lastEvaluatedKey = base64.StdEncoding.EncodeToString(b)`)
+	f.P(`	lastEvaluatedKey = base64.StdEncoding.EncodeToString(b)`)
 	f.P(`}`)
 	f.P(``)
 	f.P(`err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &`, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)), `)`)
@@ -243,7 +307,6 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 	f.P(`return nil, "", err`)
 	f.P(`}`)
 	f.P(``)
-	f.P(`log.Println("LAST KEY", lastEvaluatedKey)`)
 	f.P(``)
 	f.P(`return `, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)), `, lastEvaluatedKey, nil`)
 	f.P(`}`)

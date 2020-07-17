@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log"
 	"path"
+	"regexp"
+	"strings"
 
 	"github.com/matt-potter/protoc-gen-go-dynamodb/dynamopb"
 	"google.golang.org/protobuf/compiler/protogen"
@@ -116,4 +118,21 @@ func (g *Generator) getStorableMessages(f *protogen.File) []*protogen.Message {
 	}
 
 	return storable
+}
+
+func sanitiseString(s string) string {
+	re := regexp.MustCompile(`\W`)
+	split := re.Split(s, -1)
+
+	t := []string{}
+
+	for i, str := range split {
+		if i == 0 {
+			t = append(t, strings.ToLower(str))
+		} else {
+			t = append(t, strings.Title(str))
+		}
+	}
+
+	return strings.Join(t, "")
 }
