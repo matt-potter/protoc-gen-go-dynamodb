@@ -67,6 +67,30 @@ func NewGenerator(plugin *protogen.Plugin, pathType string) (*Generator, error) 
 	return gen, nil
 }
 
+func (g *Generator) recurseTimestampsAndGenerate(typemap map[string]*protogen.Message, f *protogen.GeneratedFile, m *protogen.Message) {
+
+	if !(string(m.GoIdent.GoImportPath) == g.importPath) {
+		return
+	}
+
+	out := getTimestampFields(m)
+
+	if len(out) > 0 {
+		if typemap[string(m.Desc.FullName())] == nil {
+			generateMessageTimestampMarshal(f, m, out)
+		}
+	}
+
+	typemap[string(m.Desc.FullName())] = m
+
+	for _, field := range m.Fields {
+		if field.Message != nil {
+			g.recurseTimestampsAndGenerate(typemap, f, field.Message)
+		}
+	}
+
+}
+
 func (g *Generator) Generate() {
 
 	g.generateHeaderAndClient()
@@ -80,6 +104,8 @@ func (g *Generator) Generate() {
 		if len(pfile.Messages) == 0 {
 			continue
 		}
+
+		tsMap := make(map[string]*protogen.Message)
 
 		for _, m := range g.getStorableMessages(pfile) {
 
@@ -97,11 +123,7 @@ func (g *Generator) Generate() {
 
 			g.generateMessageUpdate(f, m)
 
-			tsFields := getTimestampFields(m)
-
-			if len(tsFields) > 0 {
-				g.generateMessageTimestampMarshal(f, m, tsFields)
-			}
+			g.recurseTimestampsAndGenerate(tsMap, f, m)
 
 		}
 

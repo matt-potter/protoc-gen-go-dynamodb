@@ -342,7 +342,8 @@ func (g *Generator) generateMessageUpdate(f *protogen.GeneratedFile, msg *protog
 	f.P()
 }
 
-func (g *Generator) generateMessageTimestampMarshal(f *protogen.GeneratedFile, msg *protogen.Message, fields []*protogen.Field) {
+func generateMessageTimestampMarshal(f *protogen.GeneratedFile, msg *protogen.Message, fields []*protogen.Field) {
+
 	f.P(`func (a *`, msg.GoIdent.GoName, `) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {`)
 	f.P(``)
 	f.P(`	type Copy `, msg.GoIdent.GoName)
@@ -368,8 +369,8 @@ func (g *Generator) generateMessageTimestampMarshal(f *protogen.GeneratedFile, m
 	f.P(`	return err`)
 	f.P(`}`)
 	f.P(``)
-	f.P(`func (a *Activity) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {`)
-	f.P(`	type Copy Activity`)
+	f.P(`func (a *`, msg.GoIdent.GoName, `) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {`)
+	f.P(`	type Copy `, msg.GoIdent.GoName, ``)
 	f.P(``)
 	f.P(`	aux := &struct {`)
 
