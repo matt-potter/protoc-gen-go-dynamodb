@@ -19,17 +19,17 @@ func (g *Generator) generateMessageHeader(f *protogen.GeneratedFile, msg *protog
 	}
 
 	f.P(`package `, g.packageName)
-	f.P(`import (`)
-	f.P(`"context"`)
-	f.P(`"encoding/base64"`)
-	f.P(`"encoding/json"`)
-	f.P(`"log"`)
-	f.P(`"github.com/aws/aws-sdk-go/aws"`)
-	f.P(`"github.com/aws/aws-sdk-go/service/dynamodb"`)
-	f.P(`"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"`)
-	f.P(`"github.com/aws/aws-sdk-go/service/dynamodb/expression"`)
-	f.P(`"github.com/pkg/errors"`)
-	f.P(`)`)
+	// f.P(`import (`)
+	// f.P(`"context"`)
+	// f.P(`"encoding/base64"`)
+	// f.P(`"encoding/json"`)
+	// f.P(`"log"`)
+	// f.P(`"github.com/aws/aws-sdk-go/aws"`)
+	// f.P(`"github.com/aws/aws-sdk-go/service/dynamodb"`)
+	// f.P(`"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"`)
+	// f.P(`"github.com/aws/aws-sdk-go/service/dynamodb/expression"`)
+	// f.P(`"github.com/pkg/errors"`)
+	// f.P(`)`)
 	f.P(`const TableName`, msg.GoIdent.GoName, ` = "`, cfg.GetTableName(), `"`)
 	f.P()
 }
@@ -42,25 +42,25 @@ func (g *Generator) generateMessageCreate(f *protogen.GeneratedFile, msg *protog
 		log.Fatal("could not read config")
 	}
 
-	f.P(`func (d *DB) DDBCreate`, msg.GoIdent.GoName, `(ctx context.Context, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
-	f.P(`av, err := dynamodbattribute.MarshalMap(item)`)
+	f.P(`func (d *DB) DDBCreate`, msg.GoIdent.GoName, `(ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
+	f.P(`av, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "MarshalMap(item)", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"}))
 	f.P(`if err != nil {`)
 	f.P(`return item, err`)
 	f.P(`}`)
 
 	switch cfg.PrimaryIndex.SortKey {
 	case nil:
-		f.P(`expr, err := expression.NewBuilder().WithCondition(expression.AttributeNotExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `"))).Build()`)
+		f.P(`expr, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "NewBuilder()", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/expression"}), `WithCondition(expression.AttributeNotExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `"))).Build()`)
 	default:
-		f.P(`expr, err := expression.NewBuilder().WithCondition(expression.AttributeNotExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `")).And(expression.AttributeNotExists(expression.Name("`, cfg.PrimaryIndex.SortKey.GetAttrName(), `")))).Build()`)
+		f.P(`expr, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "NewBuilder()", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/expression"}), `.WithCondition(expression.AttributeNotExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `")).And(expression.AttributeNotExists(expression.Name("`, cfg.PrimaryIndex.SortKey.GetAttrName(), `")))).Build()`)
 	}
 
 	f.P(`if err != nil {`)
 	f.P(`return item, err`)
 	f.P(`}`)
-	f.P(`input := &dynamodb.PutItemInput{`)
+	f.P(`input := &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "PutItemInput", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
 	f.P(`Item:                      av,`)
-	f.P(`TableName:                 aws.String(TableName`, msg.GoIdent.GoName, `),`)
+	f.P(`TableName:                 `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(TableName`, msg.GoIdent.GoName, `),`)
 	f.P(`ConditionExpression:       expr.Condition(),`)
 	f.P(`ExpressionAttributeNames:  expr.Names(),`)
 	f.P(`ExpressionAttributeValues: expr.Values(),`)
@@ -84,20 +84,20 @@ func (g *Generator) generateMessageGet(f *protogen.GeneratedFile, msg *protogen.
 
 	switch cfg.PrimaryIndex.SortKey {
 	case nil:
-		f.P(`func (d *DB) DDBGet`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` (ctx context.Context, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
+		f.P(`func (d *DB) DDBGet`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
 	default:
-		f.P(`func (d *DB) DDBGet`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `And`, strings.Title(cfg.PrimaryIndex.SortKey.GetAttrName()), ` (ctx context.Context, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `, `, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.SortKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
+		f.P(`func (d *DB) DDBGet`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `And`, strings.Title(cfg.PrimaryIndex.SortKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `, `, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.SortKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
 	}
 
-	f.P(`input := &dynamodb.GetItemInput{`)
-	f.P(`Key: map[string]*dynamodb.AttributeValue{`)
+	f.P(`input := &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "GetItemInput", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
+	f.P(`Key: map[string]*`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
 	f.P(`"`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `": {`)
 
 	switch cfg.PrimaryIndex.PartitionKey.GetAttrType() {
 	case dynamopb.KeyDefinition_STRING:
-		f.P(`S: aws.String(`, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `),`)
+		f.P(`S: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `),`)
 	case dynamopb.KeyDefinition_NUMBER:
-		f.P(`N: aws.String(`, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `),`)
+		f.P(`N: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `),`)
 	case dynamopb.KeyDefinition_BINARY:
 		f.P(`B: `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `,`)
 	default:
@@ -109,9 +109,9 @@ func (g *Generator) generateMessageGet(f *protogen.GeneratedFile, msg *protogen.
 		f.P(`"`, cfg.PrimaryIndex.SortKey.GetAttrName(), `": {`)
 		switch cfg.PrimaryIndex.SortKey.GetAttrType() {
 		case dynamopb.KeyDefinition_STRING:
-			f.P(`S: aws.String(`, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `),`)
+			f.P(`S: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `),`)
 		case dynamopb.KeyDefinition_NUMBER:
-			f.P(`N: aws.String(`, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `),`)
+			f.P(`N: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `),`)
 		case dynamopb.KeyDefinition_BINARY:
 			f.P(`B: `, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `,`)
 		default:
@@ -120,17 +120,17 @@ func (g *Generator) generateMessageGet(f *protogen.GeneratedFile, msg *protogen.
 		f.P(`},`)
 	}
 	f.P(`},`)
-	f.P(`TableName: aws.String(TableName`, msg.GoIdent.GoName, `),`)
+	f.P(`TableName: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(TableName`, msg.GoIdent.GoName, `),`)
 	f.P(`}`)
 	f.P(`res, err := d.Client.GetItemWithContext(ctx, input)`)
 	f.P(`if err != nil {`)
 	f.P(`return nil, err`)
 	f.P(`}`)
 	f.P(`if len(res.Item) == 0 {`)
-	f.P(`return nil, errors.New("not found")`)
+	f.P(`return nil, `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "New", GoImportPath: "errors"}), `("not found")`)
 	f.P(`}`)
 	f.P(``, strings.ToLower(msg.GoIdent.GoName), ` := &`, msg.GoIdent.GoName, `{}`)
-	f.P(`err = dynamodbattribute.UnmarshalMap(res.Item, `, strings.ToLower(msg.GoIdent.GoName), `)`)
+	f.P(`err = `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "UnmarshalMap", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"}), `(res.Item, `, strings.ToLower(msg.GoIdent.GoName), `)`)
 	f.P(`if err != nil {`)
 	f.P(`return nil, err`)
 	f.P(`}`)
@@ -196,26 +196,26 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 		strings.Title(index.PartitionKey.GetAttrName()),
 		`And`,
 		strings.Title(index.SortKey.GetAttrName()),
-		`(ctx context.Context, expr expression.Expression, startKey string, limit int64) (`, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)),
+		`(ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, expr `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Expression", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/expression"}), `, startKey string, limit int64) (`, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)),
 		` []*`, msg.GoIdent.GoName, `, lastEvaluatedKey string, err error) {`)
 	f.P(``)
 	g.generateLastKeyTypes(f, msg, index)
 	f.P(``)
 	f.P(``)
 	f.P(``)
-	f.P(`input := &dynamodb.QueryInput{`)
+	f.P(`input := &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "QueryInput", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
 	f.P(`KeyConditionExpression:    expr.KeyCondition(),`)
 	f.P(`ExpressionAttributeNames:  expr.Names(),`)
 	f.P(`ExpressionAttributeValues: expr.Values(),`)
-	f.P(`Limit:                     aws.Int64(limit),`)
-	f.P(`TableName:                 aws.String(TableName`, msg.GoIdent.GoName, `),`)
+	f.P(`Limit:                     `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Int64", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(limit),`)
+	f.P(`TableName:                 `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(TableName`, msg.GoIdent.GoName, `),`)
 	if index.GetIndexName() != "" {
 		f.P(`IndexName:                 aws.String("`, index.GetIndexName(), `"),`)
 	}
 	f.P(`}`)
 	f.P(``)
 	f.P(`if startKey != "" {`)
-	f.P(`	decoded, err := base64.StdEncoding.DecodeString(startKey)`)
+	f.P(`	decoded, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "StdEncoding", GoImportPath: "encoding/base64"}), `.DecodeString(startKey)`)
 	f.P(``)
 	f.P(`	if err != nil {`)
 	f.P(`		return nil, "", err`)
@@ -227,33 +227,33 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 		f.P(`	key := new(`, sanitiseString(index.GetIndexName()), `LastKey)`)
 	}
 	f.P(``)
-	f.P(`	err = json.Unmarshal(decoded, key)`)
+	f.P(`	err = `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Unmarshal", GoImportPath: "encoding/json"}), `(decoded, key)`)
 	f.P(``)
 	f.P(`	if err != nil {`)
 	f.P(`		return nil, "", err`)
 	f.P(`	}`)
 	f.P(``)
-	f.P(`	exclusiveStartKey := map[string]*dynamodb.AttributeValue{}`)
+	f.P(`	exclusiveStartKey := map[string]*`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{}`)
 	f.P(``)
 
 	switch index.GetPartitionKey().GetAttrType() {
 
 	case dynamopb.KeyDefinition_STRING:
-		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: aws.String(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)}`)
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: aws.String(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)}`)
 	case dynamopb.KeyDefinition_NUMBER:
-		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: aws.String(strconv.Itoa(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `))}`)
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: aws.String(strconv.Itoa(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `))}`)
 	case dynamopb.KeyDefinition_BINARY:
-		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: []byte(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)}`)
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: []byte(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)}`)
 	}
 
 	if index.GetSortKey() != nil {
 		switch index.GetSortKey().GetAttrType() {
 		case dynamopb.KeyDefinition_STRING:
-			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: aws.String(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)}`)
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: aws.String(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)}`)
 		case dynamopb.KeyDefinition_NUMBER:
-			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: aws.String(strconv.Itoa(key.`, strings.Title(index.GetSortKey().GetAttrName()), `))}`)
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: aws.String(strconv.Itoa(key.`, strings.Title(index.GetSortKey().GetAttrName()), `))}`)
 		case dynamopb.KeyDefinition_BINARY:
-			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: []byte(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)}`)
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: []byte(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)}`)
 		}
 	}
 
@@ -283,7 +283,7 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 	case dynamopb.KeyDefinition_STRING:
 		f.P(`	outKey.`, strings.Title(index.GetPartitionKey().GetAttrName()), ` = *res.LastEvaluatedKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()])
 	case dynamopb.KeyDefinition_NUMBER:
-		f.P(`	outKey.`, strings.Title(index.GetPartitionKey().GetAttrName()), `, err = strconv.Atoi(*res.LastEvaluatedKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `)`)
+		f.P(`	outKey.`, strings.Title(index.GetPartitionKey().GetAttrName()), `, err = `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Atoi", GoImportPath: "strconv"}), `(*res.LastEvaluatedKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `)`)
 	case dynamopb.KeyDefinition_BINARY:
 		f.P(`	outKey.`, strings.Title(index.GetPartitionKey().GetAttrName()), ` = res.LastEvaluatedKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()])
 	}
@@ -292,16 +292,16 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 		f.P(`	outKey.`, strings.Title(index.GetSortKey().GetAttrName()), ` = *res.LastEvaluatedKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()])
 	}
 	f.P(``)
-	f.P(`	b, err := json.Marshal(outKey)`)
+	f.P(`	b, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Marshal", GoImportPath: "encoding/json"}), `(outKey)`)
 	f.P(``)
 	f.P(`	if err != nil {`)
 	f.P(`		return nil, "", err`)
 	f.P(`	}`)
 	f.P(``)
-	f.P(`	lastEvaluatedKey = base64.StdEncoding.EncodeToString(b)`)
+	f.P(`	lastEvaluatedKey = `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "StdEncoding", GoImportPath: "encoding/base64"}), `.EncodeToString(b)`)
 	f.P(`}`)
 	f.P(``)
-	f.P(`err = dynamodbattribute.UnmarshalListOfMaps(res.Items, &`, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)), `)`)
+	f.P(`err = `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "UnmarshalListOfMaps", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"}), `(res.Items, &`, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)), `)`)
 	f.P(``)
 	f.P(`if err != nil {`)
 	f.P(`return nil, "", err`)
@@ -321,25 +321,25 @@ func (g *Generator) generateMessageUpdate(f *protogen.GeneratedFile, msg *protog
 		log.Fatal("could not read config")
 	}
 
-	f.P(`func (d *DB) DDBUpdate`, msg.GoIdent.GoName, `(ctx context.Context, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
-	f.P(`av, err := dynamodbattribute.MarshalMap(item)`)
+	f.P(`func (d *DB) DDBUpdate`, msg.GoIdent.GoName, `(ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
+	f.P(`av, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "MarshalMap", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"}), `(item)`)
 	f.P(`if err != nil {`)
 	f.P(`return item, err`)
 	f.P(`}`)
 
 	switch cfg.PrimaryIndex.SortKey {
 	case nil:
-		f.P(`expr, err := expression.NewBuilder().WithCondition(expression.AttributeExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `"))).Build()`)
+		f.P(`expr, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "NewBuilder", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/expression"}), `().WithCondition(`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeExists", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/expression"}), `(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `"))).Build()`)
 	default:
-		f.P(`expr, err := expression.NewBuilder().WithCondition(expression.AttributeExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `")).And(expression.AttributeExists(expression.Name("`, cfg.PrimaryIndex.SortKey.GetAttrName(), `")))).Build()`)
+		f.P(`expr, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "NewBuilder", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/expression"}), `().WithCondition(`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeExists", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/expression"}), `(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `")).And(expression.AttributeExists(expression.Name("`, cfg.PrimaryIndex.SortKey.GetAttrName(), `")))).Build()`)
 	}
 
 	f.P(`if err != nil {`)
 	f.P(`return item, err`)
 	f.P(`}`)
-	f.P(`input := &dynamodb.PutItemInput{`)
+	f.P(`input := &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "PutItemInput", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
 	f.P(`Item:                      av,`)
-	f.P(`TableName:                 aws.String(TableName`, msg.GoIdent.GoName, `),`)
+	f.P(`TableName:                 `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(TableName`, msg.GoIdent.GoName, `),`)
 	f.P(`ConditionExpression:       expr.Condition(),`)
 	f.P(`ExpressionAttributeNames:  expr.Names(),`)
 	f.P(`ExpressionAttributeValues: expr.Values(),`)
@@ -358,10 +358,10 @@ func (g *Generator) generateMessageTimestampMarshal(f *protogen.GeneratedFile, m
 	f.P(``)
 	f.P(`	type Copy `, msg.GoIdent.GoName)
 	f.P(``)
-	f.P(`	m, err := dynamodbattribute.Marshal(&struct {`)
+	f.P(`	m, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Marshal", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"}), `(&struct {`)
 
 	for _, field := range fields {
-		f.P("		", field.GoName, " time.Time `json:\"", field.Desc.Name(), "\"`")
+		f.P("		", field.GoName, " ", f.QualifiedGoIdent(protogen.GoIdent{GoName: "Time", GoImportPath: "time"}), " `json:\"", field.Desc.Name(), "\"`")
 	}
 
 	f.P(`		*Copy`)
@@ -385,7 +385,7 @@ func (g *Generator) generateMessageTimestampMarshal(f *protogen.GeneratedFile, m
 	f.P(`	aux := &struct {`)
 
 	for _, field := range fields {
-		f.P("		", field.GoName, " time.Time `json:\"", field.Desc.Name(), "\"`")
+		f.P("		", field.GoName, " ", f.QualifiedGoIdent(protogen.GoIdent{GoName: "Time", GoImportPath: "time"}), " `json:\"", field.Desc.Name(), "\"`")
 	}
 
 	f.P(`		*Copy`)
@@ -401,7 +401,7 @@ func (g *Generator) generateMessageTimestampMarshal(f *protogen.GeneratedFile, m
 	f.P(``)
 
 	for _, field := range fields {
-		f.P(`	a.`, field.GoName, ` = timestamppb.New(aux.`, field.GoName, `)`)
+		f.P(`	a.`, field.GoName, ` = `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "New", GoImportPath: "google.golang.org/protobuf/types/known/timestamppb"}), `(aux.`, field.GoName, `)`)
 	}
 
 	f.P(``)
