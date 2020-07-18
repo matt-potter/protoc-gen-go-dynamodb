@@ -98,7 +98,10 @@ func getTimestampFields(m *protogen.Message) []*protogen.Field {
 
 	for _, field := range m.Fields {
 		if field.Message != nil {
-			out = append(out, field)
+			if field.Message.Desc.FullName() == "google.protobuf.Timestamp" {
+				out = append(out, field)
+			}
+
 		}
 	}
 

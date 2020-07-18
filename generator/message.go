@@ -239,21 +239,21 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 	switch index.GetPartitionKey().GetAttrType() {
 
 	case dynamopb.KeyDefinition_STRING:
-		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], ` = aws.String(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)`)
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: aws.String(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)}`)
 	case dynamopb.KeyDefinition_NUMBER:
-		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], ` = aws.String(strconv.Itoa(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `))`)
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: aws.String(strconv.Itoa(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `))}`)
 	case dynamopb.KeyDefinition_BINARY:
-		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], ` = []byte(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)`)
+		f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetPartitionKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetPartitionKey().GetAttrType()], `: []byte(key.`, strings.Title(index.GetPartitionKey().GetAttrName()), `)}`)
 	}
 
 	if index.GetSortKey() != nil {
 		switch index.GetSortKey().GetAttrType() {
 		case dynamopb.KeyDefinition_STRING:
-			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], ` = aws.String(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)`)
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: aws.String(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)}`)
 		case dynamopb.KeyDefinition_NUMBER:
-			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], ` = aws.String(strconv.Itoa(key.`, strings.Title(index.GetSortKey().GetAttrName()), `))`)
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: aws.String(strconv.Itoa(key.`, strings.Title(index.GetSortKey().GetAttrName()), `))}`)
 		case dynamopb.KeyDefinition_BINARY:
-			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"].`, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], ` = []byte(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)`)
+			f.P(`	exclusiveStartKey["`, strings.ToLower(index.GetSortKey().GetAttrName()), `"] = &dynamodb.AttributeValue{ `, DynamoAttributeGoMap[index.GetSortKey().GetAttrType()], `: []byte(key.`, strings.Title(index.GetSortKey().GetAttrName()), `)}`)
 		}
 	}
 
@@ -311,4 +311,100 @@ func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *pro
 	f.P(`return `, strings.ToLower(inflection.Plural(msg.GoIdent.GoName)), `, lastEvaluatedKey, nil`)
 	f.P(`}`)
 	f.P()
+}
+
+func (g *Generator) generateMessageUpdate(f *protogen.GeneratedFile, msg *protogen.Message) {
+
+	cfg, ok := proto.GetExtension(msg.Desc.Options(), dynamopb.E_Config).(*dynamopb.Cfg)
+
+	if !ok {
+		log.Fatal("could not read config")
+	}
+
+	f.P(`func (d *DB) DDBUpdate`, msg.GoIdent.GoName, `(ctx context.Context, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
+	f.P(`av, err := dynamodbattribute.MarshalMap(item)`)
+	f.P(`if err != nil {`)
+	f.P(`return item, err`)
+	f.P(`}`)
+
+	switch cfg.PrimaryIndex.SortKey {
+	case nil:
+		f.P(`expr, err := expression.NewBuilder().WithCondition(expression.AttributeExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `"))).Build()`)
+	default:
+		f.P(`expr, err := expression.NewBuilder().WithCondition(expression.AttributeExists(expression.Name("`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `")).And(expression.AttributeExists(expression.Name("`, cfg.PrimaryIndex.SortKey.GetAttrName(), `")))).Build()`)
+	}
+
+	f.P(`if err != nil {`)
+	f.P(`return item, err`)
+	f.P(`}`)
+	f.P(`input := &dynamodb.PutItemInput{`)
+	f.P(`Item:                      av,`)
+	f.P(`TableName:                 aws.String(TableName`, msg.GoIdent.GoName, `),`)
+	f.P(`ConditionExpression:       expr.Condition(),`)
+	f.P(`ExpressionAttributeNames:  expr.Names(),`)
+	f.P(`ExpressionAttributeValues: expr.Values(),`)
+	f.P(`}`)
+	f.P(`_, err = d.Client.PutItemWithContext(ctx, input)`)
+	f.P(`if err != nil {`)
+	f.P(`return item, err`)
+	f.P(`}`)
+	f.P(`return item, nil`)
+	f.P(`}`)
+	f.P()
+}
+
+func (g *Generator) generateMessageTimestampMarshal(f *protogen.GeneratedFile, msg *protogen.Message, fields []*protogen.Field) {
+	f.P(`func (a *`, msg.GoIdent.GoName, `) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {`)
+	f.P(``)
+	f.P(`	type Copy `, msg.GoIdent.GoName)
+	f.P(``)
+	f.P(`	m, err := dynamodbattribute.Marshal(&struct {`)
+
+	for _, field := range fields {
+		f.P("		", field.GoName, " time.Time `json:\"", field.Desc.Name(), "\"`")
+	}
+
+	f.P(`		*Copy`)
+	f.P(`	}{`)
+
+	for _, field := range fields {
+		f.P(`		`, field.GoName, `: a.`, field.GoName, `.AsTime(),`)
+	}
+
+	f.P(`		Copy:       (*Copy)(a),`)
+	f.P(`	})`)
+	f.P(``)
+	f.P(`	*av = *m`)
+	f.P(``)
+	f.P(`	return err`)
+	f.P(`}`)
+	f.P(``)
+	f.P(`func (a *Activity) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {`)
+	f.P(`	type Copy Activity`)
+	f.P(``)
+	f.P(`	aux := &struct {`)
+
+	for _, field := range fields {
+		f.P("		", field.GoName, " time.Time `json:\"", field.Desc.Name(), "\"`")
+	}
+
+	f.P(`		*Copy`)
+	f.P(`	}{`)
+	f.P(`		Copy: (*Copy)(a),`)
+	f.P(`	}`)
+	f.P(``)
+	f.P(`	err := dynamodbattribute.Unmarshal(av, aux)`)
+	f.P(``)
+	f.P(`	if err != nil {`)
+	f.P(`		return err`)
+	f.P(`	}`)
+	f.P(``)
+
+	for _, field := range fields {
+		f.P(`	a.`, field.GoName, ` = timestamppb.New(aux.`, field.GoName, `)`)
+	}
+
+	f.P(``)
+	f.P(`	return nil`)
+	f.P(`}`)
 }

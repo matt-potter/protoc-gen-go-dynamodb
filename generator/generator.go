@@ -95,6 +95,14 @@ func (g *Generator) Generate() {
 
 			g.generateMessageQuery(f, m)
 
+			g.generateMessageUpdate(f, m)
+
+			tsFields := getTimestampFields(m)
+
+			if len(tsFields) > 0 {
+				g.generateMessageTimestampMarshal(f, m, tsFields)
+			}
+
 		}
 
 	}
