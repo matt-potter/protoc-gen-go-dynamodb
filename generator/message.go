@@ -19,17 +19,6 @@ func (g *Generator) generateMessageHeader(f *protogen.GeneratedFile, msg *protog
 	}
 
 	f.P(`package `, g.packageName)
-	// f.P(`import (`)
-	// f.P(`"context"`)
-	// f.P(`"encoding/base64"`)
-	// f.P(`"encoding/json"`)
-	// f.P(`"log"`)
-	// f.P(`"github.com/aws/aws-sdk-go/aws"`)
-	// f.P(`"github.com/aws/aws-sdk-go/service/dynamodb"`)
-	// f.P(`"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"`)
-	// f.P(`"github.com/aws/aws-sdk-go/service/dynamodb/expression"`)
-	// f.P(`"github.com/pkg/errors"`)
-	// f.P(`)`)
 	f.P(`const TableName`, msg.GoIdent.GoName, ` = "`, cfg.GetTableName(), `"`)
 	f.P()
 }
