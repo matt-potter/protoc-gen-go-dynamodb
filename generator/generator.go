@@ -95,6 +95,8 @@ func (g *Generator) Generate() {
 
 	g.generateHeaderAndClient()
 
+	g.generateProviderTerraform()
+
 	for _, pfile := range g.plugin.Files {
 
 		if !pfile.Generate {
@@ -123,7 +125,11 @@ func (g *Generator) Generate() {
 
 			g.generateMessageUpdate(f, m)
 
+			g.generateMessageDelete(f, m)
+
 			g.recurseTimestampsAndGenerate(tsMap, f, m)
+
+			g.generateMessageTerraform(m)
 
 		}
 

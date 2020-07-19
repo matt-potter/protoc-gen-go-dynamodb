@@ -1,8 +1,13 @@
 package generator
 
 import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 	"strings"
+	"text/template"
 
 	"github.com/jinzhu/inflection"
 	"github.com/matt-potter/protoc-gen-go-dynamodb/dynamopb"
@@ -31,7 +36,7 @@ func (g *Generator) generateMessageCreate(f *protogen.GeneratedFile, msg *protog
 		log.Fatal("could not read config")
 	}
 
-	f.P(`func (d *DB) DDBCreate`, msg.GoIdent.GoName, `(ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
+	f.P(`func (d *DB) Create`, msg.GoIdent.GoName, `(ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
 	f.P(`av, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "MarshalMap(item)", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"}))
 	f.P(`if err != nil {`)
 	f.P(`return item, err`)
@@ -73,9 +78,9 @@ func (g *Generator) generateMessageGet(f *protogen.GeneratedFile, msg *protogen.
 
 	switch cfg.PrimaryIndex.SortKey {
 	case nil:
-		f.P(`func (d *DB) DDBGet`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
+		f.P(`func (d *DB) Get`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
 	default:
-		f.P(`func (d *DB) DDBGet`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `And`, strings.Title(cfg.PrimaryIndex.SortKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `, `, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.SortKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
+		f.P(`func (d *DB) Get`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `And`, strings.Title(cfg.PrimaryIndex.SortKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `, `, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.SortKey.GetAttrType()], `) (*`, msg.GoIdent.GoName, `, error) {`)
 	}
 
 	f.P(`input := &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "GetItemInput", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
@@ -179,7 +184,7 @@ func (g *Generator) generateLastKeyTypes(f *protogen.GeneratedFile, msg *protoge
 
 func (g *Generator) generateMessageQueryBody(f *protogen.GeneratedFile, msg *protogen.Message, index *dynamopb.Index) {
 
-	f.P(`func (d *DB) DDBQuery`,
+	f.P(`func (d *DB) Query`,
 		inflection.Plural(msg.GoIdent.GoName),
 		`By`,
 		strings.Title(index.PartitionKey.GetAttrName()),
@@ -310,7 +315,7 @@ func (g *Generator) generateMessageUpdate(f *protogen.GeneratedFile, msg *protog
 		log.Fatal("could not read config")
 	}
 
-	f.P(`func (d *DB) DDBUpdate`, msg.GoIdent.GoName, `(ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
+	f.P(`func (d *DB) Update`, msg.GoIdent.GoName, `(ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, item *`, msg.GoIdent.GoName, `) (*`, msg.GoIdent.GoName, `, error) {`)
 	f.P(`av, err := `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "MarshalMap", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"}), `(item)`)
 	f.P(`if err != nil {`)
 	f.P(`return item, err`)
@@ -338,6 +343,60 @@ func (g *Generator) generateMessageUpdate(f *protogen.GeneratedFile, msg *protog
 	f.P(`return item, err`)
 	f.P(`}`)
 	f.P(`return item, nil`)
+	f.P(`}`)
+	f.P()
+}
+
+func (g *Generator) generateMessageDelete(f *protogen.GeneratedFile, msg *protogen.Message) {
+
+	cfg, ok := proto.GetExtension(msg.Desc.Options(), dynamopb.E_Config).(*dynamopb.Cfg)
+
+	if !ok {
+		log.Fatal("could not read config")
+	}
+
+	switch cfg.PrimaryIndex.SortKey {
+	case nil:
+		f.P(`func (d *DB) Delete`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `) (error) {`)
+	default:
+		f.P(`func (d *DB) Delete`, msg.GoIdent.GoName, `By`, strings.Title(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `And`, strings.Title(cfg.PrimaryIndex.SortKey.GetAttrName()), ` (ctx `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "Context", GoImportPath: "context"}), `, `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.PartitionKey.GetAttrType()], `, `, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), ` `, DynamoGoMap[cfg.PrimaryIndex.SortKey.GetAttrType()], `) (error) {`)
+	}
+
+	f.P(`input := &`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "DeleteItemInput", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
+	f.P(`Key: map[string]*`, f.QualifiedGoIdent(protogen.GoIdent{GoName: "AttributeValue", GoImportPath: "github.com/aws/aws-sdk-go/service/dynamodb"}), `{`)
+	f.P(`"`, cfg.PrimaryIndex.PartitionKey.GetAttrName(), `": {`)
+
+	switch cfg.PrimaryIndex.PartitionKey.GetAttrType() {
+	case dynamopb.KeyDefinition_STRING:
+		f.P(`S: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `),`)
+	case dynamopb.KeyDefinition_NUMBER:
+		f.P(`N: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `),`)
+	case dynamopb.KeyDefinition_BINARY:
+		f.P(`B: `, strings.ToLower(cfg.PrimaryIndex.PartitionKey.GetAttrName()), `,`)
+	default:
+		log.Fatal("unknown attribute type")
+	}
+
+	f.P(`},`)
+	if cfg.PrimaryIndex.SortKey.GetAttrName() != "" {
+		f.P(`"`, cfg.PrimaryIndex.SortKey.GetAttrName(), `": {`)
+		switch cfg.PrimaryIndex.SortKey.GetAttrType() {
+		case dynamopb.KeyDefinition_STRING:
+			f.P(`S: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `),`)
+		case dynamopb.KeyDefinition_NUMBER:
+			f.P(`N: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(`, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `),`)
+		case dynamopb.KeyDefinition_BINARY:
+			f.P(`B: `, strings.ToLower(cfg.PrimaryIndex.SortKey.GetAttrName()), `,`)
+		default:
+			log.Fatal("unknown attribute type")
+		}
+		f.P(`},`)
+	}
+	f.P(`},`)
+	f.P(`TableName: `, f.QualifiedGoIdent(protogen.GoIdent{GoName: "String", GoImportPath: "github.com/aws/aws-sdk-go/aws"}), `(TableName`, msg.GoIdent.GoName, `),`)
+	f.P(`}`)
+	f.P(`_, err := d.Client.DeleteItemWithContext(ctx, input)`)
+	f.P(`return err`)
 	f.P(`}`)
 	f.P()
 }
@@ -397,4 +456,108 @@ func generateMessageTimestampMarshal(f *protogen.GeneratedFile, msg *protogen.Me
 	f.P(``)
 	f.P(`	return nil`)
 	f.P(`}`)
+}
+
+func (g *Generator) generateProviderTerraform() {
+
+	t, err := template.New("dynamodb").Parse(terraformProvider)
+
+	if err != nil {
+		log.Fatalf("Unable to parse terraform: %s", err)
+	}
+
+	var outPath string
+
+	switch g.pathType {
+	case "SOURCE_RELATIVE":
+		outPath = fmt.Sprintf("%s/terraform", g.protoPath)
+	default:
+		outPath = fmt.Sprintf("%s/terraform", g.importPath)
+	}
+
+	err = os.MkdirAll(outPath, os.ModePerm)
+
+	if err != nil {
+		log.Fatalf("Unable to create terraform dir: %s", err)
+	}
+
+	var out []byte
+
+	buf := bytes.NewBuffer(out)
+
+	err = t.Execute(buf, g)
+
+	if err != nil {
+		log.Fatalf("Unable to execute terraform: %s", err)
+	}
+
+	err = ioutil.WriteFile(fmt.Sprintf("%s/%s.tf", outPath, "provider"), buf.Bytes(), os.ModePerm)
+
+	if err != nil {
+		log.Fatalf("Unable to write terraform: %s", err)
+	}
+
+}
+
+func (g *Generator) generateMessageTerraform(msg *protogen.Message) {
+
+	cfg, ok := proto.GetExtension(msg.Desc.Options(), dynamopb.E_Config).(*dynamopb.Cfg)
+
+	if !ok {
+		log.Fatal("could not read config")
+	}
+
+	t, err := template.New("dynamodb").Parse(terraformDynamoDB)
+
+	if err != nil {
+		log.Fatalf("Unable to parse terraform: %s", err)
+	}
+
+	var outPath string
+
+	switch g.pathType {
+	case "SOURCE_RELATIVE":
+		outPath = fmt.Sprintf("%s/terraform", g.protoPath)
+	default:
+		outPath = fmt.Sprintf("%s/terraform", g.importPath)
+	}
+
+	err = os.MkdirAll(outPath, os.ModePerm)
+
+	if err != nil {
+		log.Fatalf("Unable to create terraform dir: %s", err)
+	}
+
+	var out []byte
+
+	buf := bytes.NewBuffer(out)
+
+	attrMap := map[string]string{}
+
+	attrMap[cfg.PrimaryIndex.PartitionKey.AttrName] = cfg.PrimaryIndex.PartitionKey.AttrType.String()[:1]
+
+	for _, gsi := range cfg.GlobalSecondaryIndexes {
+		attrMap[gsi.PartitionKey.AttrName] = gsi.PartitionKey.AttrType.String()[:1]
+	}
+
+	configMap := struct {
+		Attrs map[string]string
+		Cfg   *dynamopb.Cfg
+	}{
+		Attrs: attrMap,
+		Cfg:   cfg,
+	}
+
+	err = t.Execute(buf, configMap)
+
+	if err != nil {
+		log.Fatalf("Unable to parse terraform: %s", err)
+	}
+
+	err = ioutil.WriteFile(fmt.Sprintf("%s/%s.tf", outPath, strings.ToLower(cfg.TableName)), buf.Bytes(), os.ModePerm)
+
+	if err != nil {
+		log.Fatalf("Unable to write terraform: %s", err)
+	}
+
 }
