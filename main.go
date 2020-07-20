@@ -14,6 +14,8 @@ import (
 
 func main() {
 
+	var SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL)
+
 	input, _ := ioutil.ReadAll(os.Stdin)
 
 	var req pluginpb.CodeGeneratorRequest
@@ -23,6 +25,8 @@ func main() {
 	opts := protogen.Options{}
 
 	plugin, err := opts.New(&req)
+
+	plugin.SupportedFeatures = SupportedFeatures
 
 	if err != nil {
 		panic(err)
